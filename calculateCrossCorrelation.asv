@@ -1,0 +1,20 @@
+function crossCol = calculateCrossCorrelation(sourceMaximas, targetMaximas, before, after)
+    numOfSM = numel(sourceMaximas);
+if(numel(sourceMaximas)>4000)
+    indx = 1;
+    step=2000;
+    d1=[];
+    while indx<numOfSM
+        sm = sourceMaximas(indx:min(indx+step, numOfSM));
+        d = bsxfun(@minus,targetMaximas',sm);
+        fd = d((d >= -before) & (d <= after));
+        d1=[d1;fd];
+        indx = indx+step;
+    end
+  
+    crossCol = histc(d1, (-before:after)); 
+    return;
+end
+d = bsxfun(@minus,targetMaximas',sourceMaximas); %creating a distrances matrix between the target and source maximas
+d1 = d((d >= -before) & (d <= after));%filtering out the distances that are out of range (from -before to +after) - now we have a vector of all the distances that are in that range
+crossCol = histc(d1, (-before:after)); % binning the filtered values   

@@ -1,0 +1,25 @@
+function createColumnsAutomatically()
+global lineScanFigureHandles
+    %set(lineScanFigureHandles.figure1,'Pointer','watch');
+    waitbarHandle = waitbar(0,'Creating columns');
+    signal = transformLSImageToSignal();
+    waitbar(waitbarHandle,)
+    %we define a 20% change between maxima and minima a significant change that
+    %indicates a real maxima
+    significantDelta = 0.2; 
+    darknessThreshold = 0.32;
+    actualZero = 0.001;
+    intervals = findMaximasIntervalsInSignal(signal,significantDelta, darknessThreshold, actualZero,-1);
+    [numOfIntervals two] = size(intervals);
+    x = -1;
+    w = -1;
+    for i=1:numOfIntervals
+        x = intervals(i,1);
+        w = intervals(i,2);
+        drawColumn(x, w, createRandomColor(),1);
+    end
+    analyseColumn(x);
+    cell = getCellAtPosition(x);
+    deselectMarkedCell();
+    selectCell(cell. columnHandle, cell.refLineMarkerHandle);
+    set(lineScanFigureHandles.figure1,'Pointer','arrow');

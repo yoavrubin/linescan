@@ -1,0 +1,511 @@
+function varargout = lineScan(varargin)
+% LINESCAN M-file for lineScan.fig
+%      LINESCAN, by itself, creates a new LINESCAN or raises the existing
+%      singleton*.
+%
+%      H = LINESCAN returns the handle to a new LINESCAN or the handle to
+%      the existing singleton*.
+%
+%      LINESCAN('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in LINESCAN.M with the given input arguments.
+%
+%      LINESCAN('Property','Value',...) creates a new LINESCAN or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before lineScan_OpeningFunction gets called.  An
+%      unrecognized property name or invalid value makes property
+%      application
+%      stop.  All inputs are passed to lineScan_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help lineScan
+
+% Last Modified by GUIDE v2.5 12-Dec-2009 06:28:23
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @lineScan_OpeningFcn, ...
+                   'gui_OutputFcn',  @lineScan_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before lineScan is made visible.
+function lineScan_OpeningFcn(hObject, eventdata, handles, varargin)
+global lineScanFigureHandles data
+    handles.output = hObject;
+    lineScanFigureHandles = handles;
+    data.files.lsd = '';
+    data.files.dat = '';
+    data.usingStimuli = 0;
+    data.files.lsdPath = '';
+    data.objects.pan = [];
+    data.objects.zoom = [];
+    data.isAveraging = 1;
+    data.referenceImageData = [];
+    data.usedColors = [];
+    buildContextMenuForAxes(handles.flourecenceData);
+    buildContextMenuForAxes(handles.dFData);
+    buildContextMenuForAxes(handles.firstDerivationAxes);
+    % Update handles structure
+    guidata(hObject, handles);
+    fLoc = get(handles.flourecenceData,'Position');
+    dfLoc = get(handles.dFData,'Position');
+    firstDerLoc = get(handles.firstDerivationAxes,'Position');
+    tooltipPos = get(handles.stimTooltip,'Position');
+    %the following data is used for the stimuli tooltip to determin whether the
+    %cursor is over one of the axis - since it is used in a mousemove callback, we try to do as much of 
+    % the calculations offline
+    data.positions.axisLeft = fLoc(1);
+    data.positions.axisRight = fLoc(1)+fLoc(3);
+    data.positions.bottomF = fLoc(2);
+    data.positions.topF = fLoc(2)+fLoc(4);
+    data.positions.bottomDF = dfLoc(2);
+    data.positions.topDF = dfLoc(2) +dfLoc(4);
+    data.positions.bottomFirstDerivation = firstDerLoc(2);
+    data.positions.topFirstDerivation = firstDerLoc(2) + firstDerLoc(4);
+    uistack(handles.comparedImageAxes,'bottom');
+
+% UIWAIT makes lineScan wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+% --- Executes during object creation, after setting all properties.
+function comparisonLocation_CreateFcn(hObject, eventdata, handles)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes during object creation, after setting all properties.
+function comparisonScroll_CreateFcn(hObject, eventdata, handles)
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+% --- Executes during object creation, after setting all properties.
+function filterSlider_CreateFcn(hObject, eventdata, handles) %#ok<INUSD,DEFNU>
+
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+% --- Executes during object creation, after setting all properties.
+function appScroller_CreateFcn(hObject, eventdata, handles)
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+function imageScroller_CreateFcn(hObject, eventdata, handles) %#ok<DEFNU>
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+% --- Outputs from this function are returned to the command line.
+function varargout = lineScan_OutputFcn(hObject, eventdata, handles) 
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+figPos = get(handles.figure1, 'Position');
+figPos(3) = 2460;
+set(handles.figure1,'Position',figPos);
+
+% --- Executes during object creation, after setting all properties.
+function imageHorizontalScroll_CreateFcn(hObject, eventdata, handles)
+    if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor',[.9 .9 .9]);
+    end
+    
+%--------------------------------------------------------------------------
+%       Tools
+%-------------------------------------------------------------------------
+function zoomOn_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+global state data
+    if (strcmp(state.data,'noData'))
+        return;
+    end
+    if(isempty(data.objects.zoom))
+        data.objects.zoom = zoom;
+        set(data.objects.zoom,'Motion','horizontal','Enable','on');
+        ax(1) = handles.flourecenceData;
+        ax(2) = handles.dFData;
+        ax(3) = handles.firstDerivationAxes;
+        if(data.usingStimuli)
+            ax(4) = data.stimGhoustAxis(1);
+            ax(5) = data.stimGhoustAxis(2);
+            ax(6) = data.stimGhoustAxis(3);
+        end
+        linkaxes(ax,'x');
+    else
+        set(data.objects.zoom,'Enable','on');
+    end
+
+function toolsOff_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+global state data
+    if (strcmp(state.data,'noData'))
+        return;
+    end
+
+    if(~isempty(data.objects.pan))
+        set(data.objects.pan,'Enable','off');
+    end
+
+    if(~isempty(data.objects.zoom))
+        set(data.objects.zoom,'Enable','off');
+    end
+
+    if(~isempty(data.objects.cursor))
+        set(data.objects.cursor,'Enable','off');
+    end
+    
+    
+% --- Executes on button press in panOn.
+function panOn_Callback(hObject, eventdata, handles)
+    createPan();
+    
+% --- Executes on button press in cursorBtn.
+function cursorBtn_Callback(hObject, eventdata, handles)
+% Hint: get(hObject,'Value') returns toggle state of cursorBtn
+global data
+    if(isempty(data.objects.cursor))
+        data.objects.cursor = datacursormode;
+    end
+    set( data.objects.cursor,'Enable','on');
+%--------------------------------------------------------------------------
+%       end Tools
+%-------------------------------------------------------------------------
+%-----------------------------------------------
+% Start callbacks
+%-----------------------------------------------
+function createAutomatically_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+    createColumnsAutomatically();
+
+function DeltaFOverF_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+    createColumnManually();        
+
+function imageScroller_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+    val=  get(hObject,'Value') ;
+    setPosition(val);
+
+function viewData_Callback(hObject, eventdata, handles)
+    run analysisWindow;
+
+function removeBackground_Callback(hObject, eventdata, handles)
+    removeBackground();
+
+function generateColors_Callback(hObject, eventdata, handles)
+global data cells
+    data.usedColors = [];
+    [numOfCells stam] = size(cells);
+    for i=1:numOfCells
+        generateRandomColorForCell(i);
+    end
+
+function newFile_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+global data  state cells markedCell
+    state.data = 'noData';
+    cells = [];
+    markedCell.col = 0;
+    markedCell.marker = 0;
+    data.badAreas = [];
+    run filesSelector;
+
+function smoothImage_Callback(hObject, eventdata, handles)
+    run smoothingDialog;
+
+% --------------------------------------------------------------------
+function tagCells_Callback(hObject, eventdata, handles)
+    run cellTaggingDialog;
+
+% --------------------------------------------------------------------
+function export_Callback(hObject, eventdata, handles)
+    run exportDialog;
+
+% --------------------------------------------------------------------
+function crossCorrelation_Callback(hObject, eventdata, handles)
+global data
+    data.importFileName = 'current';
+    run crossCorrelationWindow;
+
+% --------------------------------------------------------------------
+function undoBgOrSmooth_Callback(hObject, eventdata, handles)
+    newImage = popActionFromUndoStack();
+    updateLinescanImage(newImage);
+
+% --------------------------------------------------------------------
+function sortSpike_Callback(hObject, eventdata, handles)
+    run spikeSortingDialog
+
+% --------------------------------------------------------------------
+function save_Callback(hObject, eventdata, handles)
+    saveColumns();
+
+% --- Executes on slider movement.
+function imageHorizontalScroll_Callback(hObject, eventdata, handles)
+global data
+    setHorizontalScrollerPositionWithinParent(size(data.imgData,2),hObject,handles.image);
+%     imageWidth = ;
+%     position = get(hObject,'Value');
+%     parentW = get(handles.image,'Parent');
+%     parentPos = get(parentW,'Position');
+%     parentWidth = parentPos(3);
+%     pos = get(handles.image,'Position');
+%     pos(1) =(parentWidth-imageWidth)*position;
+%     pos(3) = imageWidth;%just in case
+%     set(handles.image, 'Position', pos);    
+
+% --------------------------------------------------------------------
+function contrastImage_Callback(hObject, eventdata, handles)
+    imcontrast(handles.image);
+
+% --------------------------------------------------------------------
+function contrastReferenceImage_Callback(hObject, eventdata, handles)   
+    imcontrast(handles.referenceImage);
+% --------------------------------------------------------------------
+function selectColumnOnReferenceItem_Callback(hObject, eventdata, handles)
+global data
+    selectedRect = getrect(handles.referenceImage);
+    x = selectedRect(1);
+    y = selectedRect(2);
+    w = selectedRect(3);
+    h = selectedRect(4);
+    if(x <=0 || (x +w) >= 513 || y <=0 || (y+h) >=513)
+        return;
+    end
+    numOfPoints = numel(data.refLineX);
+    startIndex = -1;
+    endInded = -1;
+    for i=1:numOfPoints
+        if(startIndex == -1) %still didn't find the initial point
+            if(isPointInRectangle(data.refLineX(i), data.refLineY(i), selectedRect)) 
+              startIndex = i;
+            end
+            continue;
+        end
+        %now we have a startIndex, need to see where is the last selected
+        %pixelon top of the reference image
+        if(~isPointInRectangle(data.refLineX(i), data.refLineY(i), selectedRect)) 
+            endIndex = i-1;
+            break;
+        end
+    end
+    createColumnByXW(startIndex,endIndex-startIndex);
+  
+% --- Executes on button press in channel2Btn.
+function channel2Btn_Callback(hObject, eventdata, handles)
+    flipViewedImage('channel2');
+
+
+% --- Executes on button press in channel1Btn.
+function channel1Btn_Callback(hObject, eventdata, handles)
+   flipViewedImage('channel1');
+
+function flipViewedImage(targetImage)
+global lineScanFigureHandles cells
+    if(strcmp(targetImage, 'channel2'))
+        toShowAxes = lineScanFigureHandles.referenceImage;
+        toHideAxes = lineScanFigureHandles.channel1Image;
+    else
+         toShowAxes = lineScanFigureHandles.channel1Image;
+        toHideAxes = lineScanFigureHandles.referenceImage;
+    end
+    toShowPos = get(toShowAxes,'Position');
+    toHidePos =  get(toHideAxes,'Position');
+    toShowParent = get(toShowAxes,'Parent');
+    toHideParent =  get(toHideAxes,'Parent');
+
+    set(toShowAxes,'Position',toHidePos,'Parent',lineScanFigureHandles.appPanel);
+    set(toHideAxes,'Position',toShowPos,'Parent',lineScanFigureHandles.appPanel);
+    nc = numel(cells);
+    allLinesHandles = [];
+    for i=1:nc
+        allLinesHandles = [allLinesHandles;cells(i).refLineLabelHandle;cells(i).refLineMarkerHandle];
+    end
+    set(allLinesHandles,'Parent',toShowAxes);
+
+% --- Executes on slider movement.
+function appScroller_Callback(hObject, eventdata, handles)
+    figurePos = get(handles.figure1,'Position');
+    figureWidth = figurePos(3);
+    position = get(hObject,'Value');
+    pos = get(handles.appPanel,'Position');
+    pos(1) =(figureWidth - pos(3))*(position);
+    set(handles.appPanel, 'Position', pos);
+
+
+% --------------------------------------------------------------------
+function singleScreen_Callback(hObject, eventdata, handles)
+% hObject    handle to singleScreen (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+    figPos = get(handles.figure1, 'Position');
+    figPos(3) = 1200;
+    set(handles.figure1,'Position',figPos);
+    set(handles.appScroller,'Visible','on');
+
+
+% --------------------------------------------------------------------
+function dualScreen_Callback(hObject, eventdata, handles)
+    figPos = get(handles.figure1, 'Position');
+    figPos(3) = 2460;
+    set(handles.figure1,'Position',figPos);
+    set(handles.appScroller,'Visible','off');
+
+% --------------------------------------------------------------------
+function importColumns_Callback(hObject, eventdata, handles)
+% hObject    handle to importColumns (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global data
+    [FileName,PathName] = uigetfile(strcat(data.files.lsdPath,'*.columns'),'Import columns');
+    loadColumns(strcat(PathName, FileName));
+
+% --- Executes on button press in compareReference.
+function compareReference_Callback(hObject, eventdata, handles)
+% Hint: get(hObject,'Value') returns toggle state of compareReference
+global lineScanFigureHandles
+    toDisplay = get(hObject,'Value');
+    if(toDisplay)    
+        set(handles.browseCompare,'Enable','on');
+        set(handles.comparisonScroll,'Enable','on');
+        set(handles.comparedLabel,'Enable','on');
+        set(handles.referenceLabel,'Enable','on');
+%        pos = get(handles.referenceImage,'Position');
+        set(handles.comparedImageAxes,'Visible','on');
+        set(handles.comparedImageAxes,'XTick',[]);
+        set(handles.comparedImageAxes,'YTick',[])
+%        set(handles.referenceImage,'Position',pos);
+        [imageHandle, axHandle, figHandle] = imhandles(handles.referenceImage);
+        lineScanFigureHandles.imageHandle = imageHandle;
+        comparisonScroll_Callback(handles.comparisonScroll, eventdata, handles);
+    else
+        set(handles.browseCompare,'Enable','off');
+        set(handles.comparisonScroll,'Enable','off');
+        set(handles.comparedLabel,'Enable','off');
+        set(handles.referenceLabel,'Enable','off');
+        set(handles.comparedImageAxes,'Visible','off');
+        axes(handles.referenceImage);
+        set(lineScanFigureHandles.imageHandle,'AlphaData',1);
+        set(handles.image,'Visible','on');
+
+    end 
+
+% --- Executes on button press in browseCompare.
+function browseCompare_Callback(hObject, eventdata, handles)
+global data
+    [FileName,PathName] = uigetfile({'*.tiff;*.tif;';'*.*'},'Select Compared Image',strcat(data.files.lsdPath,'reference_image.tiff'));
+    fullPath = strcat(PathName,FileName);
+    ref = imread(fullPath);
+    set(handles.comparisonLocation,'String',PathName);
+    axes(handles.comparedImageAxes);
+    imshow(ref);
+    [imageHandle, axHandle, figHandle] = imhandles(handles.comparedImageAxes); 
+    imageHandle = imageHandle(1);
+    axHandle = axHandle(1);
+    cdata = get(imageHandle, 'CData');
+    imageRange = [double(min(cdata(:))) double(max(cdata(:)))];
+    set(axHandle,'Clim', imageRange);
+
+function comparisonScroll_Callback(hObject, eventdata, handles)
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+    global cells lineScanFigureHandles data
+    set(lineScanFigureHandles.imageHandle ,'AlphaData',1-get(hObject,'Value'));
+    if(get(hObject,'Value') == 0)
+        set(handles.imageHoldingPanel,'Visible','on');
+    else
+        set(handles.imageHoldingPanel,'Visible','off');
+    end
+    nc = numel(cells);
+    allLinesHandles = data.lineHandles;
+    for i=1:nc
+        allLinesHandles = [allLinesHandles;cells(i).refLineLabelHandle;cells(i).refLineMarkerHandle];
+    end
+    if(get(hObject,'Value') == 1)
+        set(allLinesHandles,'Visible','off');
+    else
+        set(allLinesHandles,'Visible','on');
+    end
+    
+% --- Executes on button press in showColumnsNameBtn.
+function showColumnsNameBtn_Callback(hObject, eventdata, handles)
+global cells
+    if(get(hObject,'Value'))
+        visibleValue = 'on';
+    else
+        visibleValue = 'off';
+    end 
+    nc = numel(cells);
+    for i=1:nc
+        cell = cells(i);
+        set(cell.columnTagHandle,'Visible',visibleValue);
+    end
+
+% --------------------------------------------------------------------
+function showAcqiuredChannels_Callback(hObject, eventdata, handles)
+global data
+    figure;
+    plot(data.recording.values);
+
+% % --------------------------------------------------------------------
+% function averageValues_Callback(hObject, eventdata, handles)
+% global data
+%     data.isAveraging = ~data.isAveraging;
+%     if data.isAveraging
+%         set(hObject,'Checked','on');
+%     else
+%         set(hObject,'Checked','off');
+%     end
+
+
+
+function filteredValues =  filterOurNaN(values)
+    firstNaN = find(isnan(values) ,1,'first');
+    if(isempty(firstNaN))
+        filteredValues = values;
+    else
+        filteredValues = values(1:firstNaN-1) * 1000;
+    end
+
+
+% --------------------------------------------------------------------
+function correlationFromExcel_Callback(hObject, eventdata, handles)
+% hObject    handle to correlationFromExcel (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global cells data
+    [filename,pathname] = uigetfile('*.xls','Select the Excel-file');
+    if isequal(filename,0)
+       return;
+    end
+    data.importFileName = filename;
+    [spikeTimes, cellNames] = xlsread(fullfile(pathname, filename));
+    cells = [];
+    numCells = numel(cellNames);
+    data.timePerLine = 1;
+    for i=1:numCells
+        cell.name = cellNames{i};
+        spikes = filterOurNaN(spikeTimes(:,i));
+        cell.spikes.x = spikes;
+        cell.color = createRandomColor();
+        cell.refLineLabelHandle = -1;
+        cells = [cells;cell];
+    end
+    data.usedColors = [];
+    data.pixelResamplingFactor = 1;
+    data.timePerLine = 1;
+    run crossCorrelationWindow;

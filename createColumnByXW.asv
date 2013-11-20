@@ -1,0 +1,6 @@
+function [subLineX subLineY] = getColumnReferenceLinePoints(x, width)
+    
+deselectMarkedCell();
+    [rectHandle refSubLine] = drawColumn(rect(1), rect(3), createRandomColor(),1);
+    analyseColumn(rect(1));
+    selectCell(rectHandle,refSubLine);

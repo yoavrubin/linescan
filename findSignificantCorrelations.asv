@@ -1,0 +1,46 @@
+% crossCorrelations : a list of elements, each one has the fields source,
+% target and correlation (which is the result from calculateCrossCorrelation)
+% significantCorrelations: a list of structures, each one corresponds to an
+% element in the crossCorrelations, from which it takes the source ,target and adds to it the location field, which is the time of the significant correlation, in pixel units 
+function significantCorrelations = findSignificantCorrelations(crossCorrelations, minSpikes, numOfSTDs)
+    significantCorrelations = [];
+    if(isempty(crossCorrelations))
+        return;
+    end
+    numOfCorrelations = numel(crossCorrelations);
+    numOfItemsInCorrelation = numel(crossCorrelations(1).correlation);
+    allCorrelations = zeros(numOfItemsInCorrelation,numOfCorrelations);
+    for i=1:numOfCorrelations
+       allCorrelations(:,i) =  crossCorrelations(i).correlation;
+    end
+    allSTDs = std(allCorrelations);
+    allMeans = mean(allCorrelations);
+    allMax = max(allCorrelations);
+    allMin = min(allCorrelations);
+    allSigMax = allMeans+numOfSTDs*allSTDs;
+    allSigMin = allMeans - numOfSTDs*allSTDs;
+    allRealSigsMaxBool = ((allMax >= allSigMax)  & (allMax >= minSpikes));
+    allRealSigsMinBool = ((allMin <=  allSigMin) & (allSigMin > 0));
+    allMaxLocations = bsxfun(@times,allMax,allRealSigsMaxBool);
+    allMinLocations = bsxfun(@times,allMin,allRealSigsMinBool);
+    allLocations = bsxfun(@max,allMaxLocations,allMinLocations);
+    maxIndices = find(allRealSigsMaxBool);
+    minIndices = find(allRealSigsMinBool);
+    relevantIndices = unique(sort([maxIndices minIndices]));
+    if(isempty(relevantIndices))
+        return;
+    end
+    expandedSigs = repmat(allLocations,numOfItemsInCorrelation,1);
+    realSigs = expandedSigs == allCorrelations;
+    %there may be several occarances of the min or max in a column ,so we
+    %filter them by cumsuming the realSigs and calcing the places where the
+    %summed is equal to the realSigs and the real sigs was 1
+    summedSigs = cumsum(realSigs);
+    realSigs = ((realSigs==1) + (summedSigs ==1) ==2);%
+    [locs stam] = find(realSigs(:,relevantIndices)); 
+    sources = {crossCorrelations(relevantIndices).source};
+    targets = {crossCorrelations(relevantIndices).target};
+    locs = num2cell(locs)';
+    corrs = mat2cell(allCorrelations(:,relevantIndices)',ones(numel(relevantIndices),1),numOfItemsInCorrelation)';
+    significantCorrelations = struct('source',sources,'target',targets,'location',locs,'correlation',corrs)';
+    

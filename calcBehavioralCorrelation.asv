@@ -1,0 +1,47 @@
+function allCorrelations = calcBehavioralCorrelation(before,after)
+global cells
+    numOfRuns = before + after +1;
+    allCorrelations = [];
+    numOfCells = numel(cells);
+    for s=1:numOfCells
+        for t=1:numOfCells
+            if(s==t)
+                continue;
+            end
+            sourceSignal = cells(s).F;
+            targetSignal = cells(t).F;
+            behavior = [];
+            for i=1:numOfRuns
+                startSource = before;
+                endSource = numel(sourceSignal)-after-1;
+
+                currSource = sourceSignal(startSource:endSource);
+                startTarget = i;
+                endTarget = i+numel(currSource)-1;
+
+                currTarget = targetSignal(startTarget: endTarget);
+                delta = abs(currTarget - currSource);
+                total = double(sum(delta)) / double(numel(currTarget));
+                behavior = [behavior total];
+            end
+            mn = mean(behavior);
+            theSTD = std(behavior);
+            topSTD = mn+3*theSTD;
+            bottomSTD = mn-3*theSTD;
+            theMax = max(behavior);
+            theMin = min(behavior);
+            if(theMax >= topSTD )%||   theMin <= bottomSTD)
+                onlyMax = (behavior == 
+                indx = find(
+                correlationData.source = s;
+                correlationData.target = t;
+                correlationData.correlation = behavior;
+                correlationData.location = 2;
+                allCorrelations = [allCorrelations ; correlationData];
+            end
+        end
+    end
+    
+    
+    
+

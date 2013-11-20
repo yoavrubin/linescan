@@ -1,0 +1,31 @@
+function updateLinescanImage(newImageValue)
+global data lineScanFigureHandles
+    cellsData = extractCellsData();
+    data.imgData = newImageValue;
+    axes(lineScanFigureHandles.image)
+    imshow( imadjust(data.imgData));
+    drawBadArea(data.badAreas, lineScanFigureHandles.image);n
+    redrawColumns();
+    
+function cellsData = extractCellsData()
+global cells
+
+numOfCells = numel(cells);
+cellsData = [];
+for i=1:numOfCells
+    cell = cells(i);
+    pos = get(cell.columnHandle,'Position');
+    cellData.x = pos(1);
+    cellData.w = pos(3);
+    cellData.color = get(cell.columnHandle,'EdgeColor');
+    cellData.isNeuron = cell.isNeuron;
+    cellsData = [cellsData; cellData];
+end
+
+function redrawColumns(cellsData)
+global cells
+cells = [];
+numOfCells = numel(cellData);
+for i=1:numOfCells
+    drawColumn(cellData.x, width, theColor, isNeuron, varargin)
+end

@@ -1,0 +1,18 @@
+
+    function lsdBrowse_Callback(hObject, eventdata, handles)
+global data usedPath
+    [FileName,PathName] = uigetfile(strcat(usedPath,'*.lsd'),'Select Line Scan Data File');
+ %  ref = imread('C:\LineScan-12012008-1830-1263-Cycle001_Ch2Source.tif');
+ 
+   FileName
+    PathName 
+   ref = imread(strcat(PathName,FileName));
+   
+      imshow(ref)
+        if isequal(FileName,0)
+        return;
+    end
+    
+    
+    
+    

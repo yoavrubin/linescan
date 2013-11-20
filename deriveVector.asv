@@ -1,0 +1,9 @@
+function result = deriveVector(vector)
+    shiftedVector = [vector(2:numel(vector)); 0];
+    result = shiftedVector - vector ; 
+    
+%     n = sz(1);
+%     result = zeros(n,1);
+%     for i=2:n
+%         result(i) =  vector(i) - vector(i-1);
+%     end

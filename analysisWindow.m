@@ -1,0 +1,393 @@
+function varargout = analysisWindow(varargin)
+% ANALYSISWINDOW M-file for analysisWindow.fig
+%      ANALYSISWINDOW, by itself, creates a new ANALYSISWINDOW or raises the existing
+%      singleton*.
+%
+%      H = ANALYSISWINDOW returns the handle to a new ANALYSISWINDOW or the handle to
+%      the existing singleton*.
+%
+%      ANALYSISWINDOW('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in ANALYSISWINDOW.M with the given input arguments.
+%
+%      ANALYSISWINDOW('Property','Value',...) creates a new ANALYSISWINDOW or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before analysisWindow_OpeningFunction gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to analysisWindow_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help analysisWindow
+
+% Last Modified by GUIDE v2.5 06-Dec-2007 15:37:19
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @analysisWindow_OpeningFcn, ...
+                   'gui_OutputFcn',  @analysisWindow_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before analysisWindow is made visible.
+function analysisWindow_OpeningFcn(hObject, eventdata, handles, varargin)
+global data analysisWindowHandles
+    ampVals = [];
+    ampVals = [ampVals;getDistinctValues(data.amps);{'All'}];
+    freqVals = [];
+    freqVals = [freqVals;getDistinctValues(data.freqs);{'All'}];
+    set(handles.freqCombo,'String',freqVals);
+    set(handles.ampCombo,'String',ampVals);
+    % Choose default command line output for analysisWindow
+    handles.output = hObject;
+    % Update handles structure
+    guidata(hObject, handles);
+    analysisWindowHandles = handles;
+    createXYLabels(handles.dataAxes);
+    % UIWAIT makes analysisWindow wait for user response (see UIRESUME)
+    % uiwait(handles.figure1);
+
+function createXYLabels(theAxes)
+    xlabel(theAxes,'Time','Color','b','FontSize',14); 
+    ylabel(theAxes,'dF/F','Color','b','FontSize',14);
+
+function varargout = analysisWindow_OutputFcn(hObject, eventdata, handles) 
+    varargout{1} = handles.output;
+function beforeTxt_Callback(hObject, eventdata, handles)
+function beforeTxt_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+function afterTxt_Callback(hObject, eventdata, handles)
+function afterTxt_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+function cellCombo_Callback(hObject, eventdata, handles)
+function cellCombo_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+function freqCombo_Callback(hObject, eventdata, handles)
+function freqCombo_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+function ampCombo_Callback(hObject, eventdata, handles)
+function ampCombo_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+
+function calcAvg_Callback(hObject, eventdata, handles)
+    set(handles.groupByFreqs,'Enable','on');
+    set(handles.groupByAmps,'Enable','on');
+
+function calcAll_Callback(hObject, eventdata, handles)
+    set(handles.groupByFreqs,'Enable','off');
+    set(handles.groupByAmps,'Enable','off');  
+
+function indices = getIntervalsOfSelectedAmpAndFreq(amp,freq,isGroupByAmps,isGroupByFreqs)
+global analysisWindowHandles
+    allAmps = get(analysisWindowHandles.ampCombo,'String');
+    allFreqs = get(analysisWindowHandles.freqCombo,'String');
+    indices = [];
+    numAmps = size(allAmps) -1;
+    numFreqs  = size(allFreqs) -1;
+    currAmp = amp;
+    if(isGroupByAmps && isGroupByFreqs)
+        grouping = 'Amplitude & Frequency';
+    end
+    if(isGroupByAmps && ~isGroupByFreqs)
+        grouping = 'Amplitude';
+    end
+    if(~isGroupByAmps && isGroupByFreqs)
+        grouping = 'Frequency';
+    end
+    if(~isGroupByAmps && ~isGroupByFreqs)
+        grouping = 'No grouping';
+    end
+    for a=1:numAmps
+        if(isGroupByAmps && strcmp(amp,'All'))
+            currAmp = str2double(allAmps{a});
+        end 
+        for f=1:numFreqs
+            if(isGroupByFreqs && strcmp(freq,'All'))
+                currFreq = str2double(allFreqs{f});
+                indices = [indices; {getIntervalsCellForAmpAndFreq(currAmp,currFreq)},num2str(currAmp),allFreqs{f},grouping]; 
+            else    
+                indices = [indices ;{getIntervalsCellForAmpAndFreq(currAmp,freq)},num2str(currAmp),num2str(freq),grouping];
+                break;
+            end 
+        end
+        if(~isGroupByAmps ||  ~strcmp(amp,'All'))
+            break;
+        end
+    end
+
+function indices = getIntervalsCellForAmpAndFreq(amp,freq)
+global data
+    [numOfIntervals stam] = size(data.stimuliIntervals);
+    indices = [];
+    for i=1:numOfIntervals
+        if(strcmp(amp,'All') || amp == data.stimuliIntervals(i,3))
+            if(strcmp(freq,'All') || freq == data.stimuliIntervals(i,4))
+                if(~isIntervalValid(data.stimuliIntervals(i,1),data.stimuliIntervals(i,2)))
+                    continue;
+                end
+              indices = [indices ; data.stimuliIntervals(i,1) data.stimuliIntervals(i,2)];  
+            end
+        end
+    end
+
+function dfData = getDfDataOfCellColumn(cellColumn)
+    cellPosition = get(cellColumn,'Position');
+    minX = cellPosition(1);
+    maxX = minX + cellPosition(3);
+    [fData dfData] = getFAndDfData(minX, maxX);
+
+function calculateBtn_Callback(hObject, eventdata, handles)
+global markedAreaHandle cells markedCell selectedLine data
+    selectedLine = [];
+    toClear = get(handles.clearCalc,'Value');
+    axes(handles.dataAxes);
+    if(toClear)   
+        cla;
+        markedAreaHandle = [];
+        data.lines = [];
+        set(handles.timeValue,'String','');
+        set(handles.dfValue,'String','');
+        set(handles.amplitudeValue,'String','');
+        set(handles.frequencyValue,'String','');
+        set(handles.averageAllValue,'String','');
+        set(handles.groupingValue,'String','');
+        allLines = get(handles.dataAxes,'Children');
+        [numOfLines stam] = size(allLines);
+        data.lines = [];
+    end
+    allFreqs =  get(handles.freqCombo,'String');
+    freq = allFreqs{get(handles.freqCombo,'Value')};
+    if(~strcmp(freq,'All'))
+        freq = str2double(freq);
+    end
+    allAmps = get(handles.ampCombo,'String');
+    amp = allAmps{get(handles.ampCombo,'Value')};
+    if(~strcmp(amp,'All'))
+        amp = str2double(amp);
+    end
+    before = str2double(get(handles.beforeTxt,'String'));
+    after = str2double(get(handles.afterTxt,'String'));
+    isCalcAvg = get(handles.calcAvg,'Value');
+    isGroupByAmps = 0;
+    isGroupByFreqs = 0;
+    if(isCalcAvg)
+       isGroupByAmps = get(handles.groupByAmps,'Value');
+       isGroupByFreqs = get(handles.groupByFreqs,'Value');
+    end
+    intervals = getIntervalsOfSelectedAmpAndFreq(amp,freq,isGroupByAmps,isGroupByFreqs);
+    cellToAnalyzeOptions = get(handles.cellCombo,'String');
+    cellToAnalyze = cellToAnalyzeOptions{get(handles.cellCombo,'Value')};
+    isRelative = get(handles.isRelative,'Value');
+    if(strcmp(cellToAnalyze,'All'))
+        [numOfCells stam] = size(cells);
+        for i=1:numOfCells
+            cell = cells(i);
+            analyzeColumn(cell.columnHandle, intervals, before, after, isCalcAvg, handles,isRelative);
+        end
+    else
+        analyzeColumn(markedCell.col, intervals, before, after, isCalcAvg, handles,isRelative);
+    end
+    lines = get(handles.dataAxes,'Children');
+    avgAll = '';
+    if(isCalcAvg)
+        avgAll = 'Average';
+    else
+       avgAll = 'All';
+    end
+    [numOfLines stam] = size(lines);
+    for i=1:numOfLines
+        if(~strcmp(get(lines(i),'Type'),'line'))
+            continue;
+        end
+        set(lines(i),'ButtonDownFcn',@pointValuesDisplay);
+        lineUserData = get(lines(i),'UserData');
+        [numOfParams stam] = size(lineUserData.queryParams);
+        if(numOfParams < 4)
+            lineUserData.queryParams = [lineUserData.queryParams {avgAll}];
+            set(lines(i),'UserData',lineUserData);
+        end        
+    end
+
+function analyzeColumn(column,intervals, before, after, isCalcAvg, handles,isRelative)
+    dfData = getDfDataOfCellColumn(column);
+    isNeuron = checkIsNeuron(column);
+    color = get(column,'EdgeColor');
+    numOfIntervals = size(intervals);
+    for i=1:numOfIntervals
+        plottedLine = analyseCellBehavior(dfData, intervals{i}, before, after, isCalcAvg, color,isNeuron, isRelative);
+        createContextMenuForPlottedLine(plottedLine);
+        createInitialUserDataForPlottedLine(plottedLine,column,get(column,'UserData'),intervals{i,2},intervals{i,3},intervals{i,4});
+    end
+
+function isNeuron = checkIsNeuron(column)
+global cells
+    isNeuron =1;
+    [numOfCells stam] = size(cells);
+    for i=1:numOfCells
+        if(cells(i).columnHandle == column)
+            isNeuron = cells(i).isNeuron;
+        end
+    end
+
+
+function createInitialUserDataForPlottedLine(plottedLine, column, marker,amp,freq,grouping)
+    [numOfLines stam] = size(plottedLine);
+    for i=1:numOfLines
+        lineUserData.column = column;
+        lineUserData.marker = marker;
+        lineUserData.queryParams = [{amp} {freq} {grouping}];
+        set(plottedLine(i),'UserData',lineUserData);
+    end
+
+function createContextMenuForPlottedLine(plottedLine)
+    cmenu = uicontextmenu;
+    deleteMenu = uimenu(cmenu,'Label','Delete');
+    uimenu(deleteMenu, 'Label','Only This Trace','Callback',@deleteTrace,'UserData','trace');
+    uimenu(deleteMenu, 'Label','All Traces of This Cell','Callback',@deleteTrace,'UserData','all');
+    lineStyleMenu = uimenu(cmenu,'Label','Line Style');
+    uimenu(lineStyleMenu, 'Label','Solid','Callback',@setLineStyle,'UserData','-');
+    uimenu(lineStyleMenu, 'Label','Dashed','Callback',@setLineStyle,'UserData','--');
+    uimenu(lineStyleMenu, 'Label','Dotted','Callback',@setLineStyle,'UserData',':');
+    uimenu(lineStyleMenu, 'Label','Dash Dot','Callback',@setLineStyle,'UserData','-.');
+    [numOfLines stam] = size(plottedLine);
+    for i=1:numOfLines
+        set(plottedLine(i),'UIContextMenu',cmenu);
+    end
+
+
+function setLineStyle(src,eventData)
+global selectedLine
+lineStyle = get(src,'UserData');
+set(selectedLine,'LineStyle',lineStyle);
+
+function deleteTrace(src,eventData)
+global selectedLine markedAreaHandle
+
+delete(markedAreaHandle);
+if(strcmp(get(src,'UserData'),'trace'))
+    delete(selectedLine);
+end
+
+if(strcmp(get(src,'UserData'),'all'))
+    userData = get(selectedLine,'UserData');
+    traces = getTracesOfColumn(userData.column);
+    delete(traces);
+end
+selectedLine = [];
+markedAreaHandle = [];
+
+function pointValuesDisplay(src, eventData)
+global analysisWindowHandles markedAreaHandle selectedLine
+    dataAxes = get(src,'Parent');
+    points = get(dataAxes,'currentPoint');
+    x = num2str(points(1,1));
+    y = num2str(points(1,2));
+    if(~isempty(selectedLine))
+        set(selectedLine,'LineWidth',0.5);
+    end
+    selectedLine = src;
+    set(selectedLine,'LineWidth',2);
+    lineUserData = get(src,'UserData');
+    deselectMarkedCell();
+    selectCell(lineUserData.column, lineUserData.marker);
+    queryParams = lineUserData.queryParams;
+    [xMin xMax xRange] = getEdgesAndRange(dataAxes,'x');
+    [yMin yMax yRange] = getEdgesAndRange(dataAxes,'y');
+    xDistance = xRange/150;
+    yDistance = yRange/100;
+    leftMostX = points(1,1) -xDistance;
+    width = 2*xDistance;
+    downMostY = points(1,2)-yDistance;
+    height = 2*yDistance;
+    theRect = [double(leftMostX) double(downMostY) double(width) double(height)]; 
+    if(isempty(markedAreaHandle))
+        markedAreaHandle = rectangle('Position',theRect, 'EdgeColor','r');
+    else
+        set(markedAreaHandle,'Position',theRect);
+    end
+    amp = queryParams{1};
+    freq = queryParams{2};
+    grouping = queryParams{3};
+    avgAll = queryParams{4};
+    set(analysisWindowHandles.timeValue,'String',x);
+    set(analysisWindowHandles.dfValue,'String',y);
+    set(analysisWindowHandles.amplitudeValue,'String',amp);
+    set(analysisWindowHandles.frequencyValue,'String',freq);
+    set(analysisWindowHandles.averageAllValue,'String',avgAll);
+    set(analysisWindowHandles.groupingValue,'String',grouping);
+
+function createNewFigure_Callback(hObject, eventdata, handles)
+global analysisWindowHandles
+    h = figure();
+    newAxes = axes;
+    createXYLabels(newAxes);
+    allLines = get(analysisWindowHandles.dataAxes,'Children');
+    [numOfLines stam] = size(allLines);
+    lines = [];
+    for i=1:numOfLines
+        if(~strcmp(get(allLines(i),'Type'),'line'))
+            continue;
+        end
+        copyLine(allLines(i));
+    end
+
+function newLine = copyLine(sourceLine)
+    xData = get(sourceLine,'XData');
+    yData = get(sourceLine,'YData');
+    color = get(sourceLine,'Color');
+    lineStyle = get(sourceLine,'LineStyle');
+    newLine = line('XData',xData,'YData',yData,'Color',color,'LineStyle',lineStyle);
+
+function saveTraces_Callback(hObject, eventdata, handles)
+global data
+    allLines = data.lines;
+    [numOfLines stam] = size(allLines);
+    tracesDir = uigetdir(data.files.lsdPath ,'Export Traces');
+    if(~tracesDir)
+        return;
+    end
+    lines = [];
+    fileBaseName = strcat(tracesDir,'\');
+    for i=1:numOfLines
+        cellName = getCellName(allLines(i));
+        saveLine(strcat(fileBaseName,cellName,'_line_',num2str(i),'.txt'),allLines(i));
+    end
+
+function saveLine(fileName,line)
+    lineUserData = get(line,'UserData');
+    queryParams = lineUserData.queryParams;
+    header = ['Amplitude: ' queryParams{1} ' , Frequency: ' queryParams{2} ' , Grouping: ' queryParams{3} ' , Average/All: ' queryParams{4}];
+    xData = get(line,'XData');
+    yData = get(line,'YData');
+    writeDataToFile(fileName,xData,yData,header);
+
+function cellName =  getCellName(line)
+global cells
+    color = get(line,'Color');
+    index  = getCellWithColor(color);
+    cellName = cells(index).name;

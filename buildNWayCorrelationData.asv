@@ -1,0 +1,32 @@
+%building nWayCorrelationData based on a previously built
+%nWayCorrelationsData - adding another level to the data by appending the
+%target to the sources list
+function nWayCorrelationData = buildNWayCorrelationData(correlations)
+    global crossCorrelationData
+    numOfCorrelations = numel(correlations);
+    nWayCorrelationData = [];
+    if(numOfCorrelations == 0)
+        return;
+    end
+    jitter = str2num(get(crossCorrelationData.handles.nWayJitter,'String'))/2;
+    jitterInPixels = jitter / pixelToTime(1);
+    corSources = [correlations.source];
+    references = {corSources.reference};
+    sources = {corSources.sources};
+    targets = {correlations.target};
+    locationTimesM = [correlations.location] - jitterInPixels;
+    locationTimesP = [correlations.location] + jitterInPixels;
+    offsets = [locationTimesM'  locationTimesP'];
+    offsetsCell = mat2cell(offsets,ones(size(offsets,1),1),2);
+    srcs = struct('name',targets,'offset',offsetsCell');
+    sources = num2cell([corSources.sources; srcs]);
+    nWayCorrelationData1 = struct('reference',references,'sources',sources,)
+    for i=1:numOfCorrelations
+        correlationData.reference = correlations(i).source.reference;
+        correlationData.sources = correlations(i).source.sources;
+        src.name = correlations(i).target;
+        locationTime = correlations(i).location;
+        src.offset = [(locationTime-jitterInPixels) (locationTime+jitterInPixels)];
+        correlationData.sources = [correlationData.sources ; src];
+        nWayCorrelationData = [nWayCorrelationData; correlationData];
+    end

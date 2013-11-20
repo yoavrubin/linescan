@@ -1,0 +1,85 @@
+function intervals = findMaximasIntervalsInSignal(signal, significantDelta, maximaThreshold,actualZero, minimumMaximaRadius)
+    intervals = [];
+    edgesIndices = int16(getEdgesIndices(signal',actualZero));
+    realMaximas = [];
+    numOfEdges = numel(edgesIndices);
+    if(edgesIndices(1) > 0) % the first edge is a maxima - doesn't have a minima on the left
+        currMaximaValue = signal(edgesIndices(1));
+        minimaOnTheRightValue = signal(-edgesIndices(2));
+        if(currMaximaValue *(1-significantDelta) >minimaOnTheRightValue) % found a real maxima
+            realMaximas = [realMaximas ; edgesIndices(1)];
+        end
+    end
+    for i=2:numOfEdges-1
+        if(edgesIndices(i) < 0) %minima
+            continue;
+        end
+        currentMaximaIndex = edgesIndices(i);
+        currentMaximaValue = signal(currentMaximaIndex);
+        currentMaximaBottomRangeValue = currentMaximaValue *(1-significantDelta);   
+        minimaOnTheLeftIndex = edgesIndices(i-1) *(-1);
+        minimaOnTheLeftValue = signal(minimaOnTheLeftIndex);
+        minimaOnTheRightIndex = edgesIndices(i+1) *(-1);
+        minimaOnTheRightValue = signal(minimaOnTheRightIndex);  
+        if(currentMaximaBottomRangeValue >= minimaOnTheLeftValue) % the maxima is significantly bigger then the minima on the left
+                if(currentMaximaBottomRangeValue >= minimaOnTheRightValue) % the maxima is also significantly bigger then the minima on the right
+                    if(currentMaximaValue >= maximaThreshold && (minimaOnTheRightIndex -minimaOnTheLeftIndex) >=minimumMaximaRadius ) % filtering out irelevant maximas  - by value above threshold and minimal width
+                        realMaximas = [realMaximas; currentMaximaIndex]; % found a real maxima
+                    end
+                    continue;
+                end
+        end
+      % Since this maxima is not significantly bigger then its
+      % neighbours, we should not treat it as a maxima, thus we should look for the next maxima and let it know
+      % that the minima on the left that it should inspect is not
+      % the minima that is really on its left (which is the current
+      % maxima's minima on the right), but it should treat this
+      % current maxima's left minima as its left minima
+        if(minimaOnTheLeftValue < minimaOnTheRightValue)  
+                 edgesIndices(i+1) = edgesIndices(i-1);% basically setting the next minima index to be the previous minima index
+        end
+    end
+    % at this point we have the set of real maximas, for each one of them we
+    % should create a column, that its edges has a flourecence of
+    % (1-significantDelta)*(the_maxima's_flourecenceValue)
+    numOfRealMaximas = numel(realMaximas);
+    for i=1:numOfRealMaximas
+        currentMaximaIndex = realMaximas(i);
+        currentMaximaValue = signal(currentMaximaIndex);
+        currentMaximaBottomRangeValue = currentMaximaValue *(1-significantDelta);
+        %first go from the maxima left - until we will hit a point where the
+        %flourecence is less then the currentMaximaBottomRangeValue - we know
+        %that such a point exist since the real minima before this maxima has
+        %such a value
+        leftIndex = currentMaximaIndex;
+        while(1)
+            leftIndex = leftIndex-1;
+            if(leftIndex == 1 || leftIndex == 0)
+                break;
+            end
+            if(signal(leftIndex) <= currentMaximaBottomRangeValue)
+                break;
+            end
+        end
+        % now go right from the maxima - until we will hit a point where the
+        %flourecence is less then the currentMaximaBottomRangeValue - we know
+        %that such a point exist since the real minima after this maxima has
+        %such a value
+        rightIndex = currentMaximaIndex;
+        w = -1;
+        numOfPoints = numel(signal);
+        while(1)
+            rightIndex = rightIndex+1;
+            if(rightIndex >numOfPoints)
+                break;
+            end
+            if(signal(rightIndex) <currentMaximaBottomRangeValue)
+               break;
+            end
+        end
+        w = rightIndex-leftIndex;
+        if(leftIndex == 0)
+        leftIndex = 1;
+        end
+        intervals = [intervals ; leftIndex w];
+    end

@@ -1,0 +1,191 @@
+function readStimuliConfigFile
+global data
+    fileLocation = data.files.cfg;
+    data.freqs = [];
+    data.amps = [];
+    fid = fopen(fileLocation);
+    firstLine = fgetl(fid);
+    if(strcmp(firstLine,'stim type = sin_stim_amp1'))
+        data.stimuliFileType='sinStim';
+        readSinStimAmp1Params(fid);
+    else
+        data.stimuliFileType='randomIso';
+        readRandomIsoParams(fid);
+    end
+    data.valsOfAmps = getDistinctValues(data.amps);
+    data.valsOfFreqs = getDistinctValues(data.freqs);
+    data.stimuliIntervals = getStimulationIntervals();
+
+function readRandomIsoParams(fid)
+    freqs = [];
+    amps = [];
+    while 1
+        tline = fgetl(fid);
+        if ~ischar(tline)   
+            break;   
+        end
+        if(~isempty(findstr(tline,'low frequency')))
+            freqs = readFreqsLine(fgetl(fid));
+            amps = readAmpsLine(fgetl(fid));
+            fgetl(fid);
+            readFreqsAndAmps(fid,freqs,amps);
+            return;
+        end
+    end
+
+function freqs = readFreqsLine(line)
+%example: 100  - 1  150 - 2  250  - 3  350 - 4  450 - 5   450 - 6 
+    freqs = [];
+    res = textscan(line,'%f %s %f');
+    freqs = res{1};
+
+function amps = readAmpsLine(line)
+%example: amplitude array =	1.000	4.900	
+    amps = [];
+    remain = strrep(line,'amplitude array =','');
+    while 1
+        if(isempty(remain))
+            break;
+        end
+        [amp remain] = strtok(remain); %#ok<STTOK>
+        amps = [amps; str2double(amp)];
+    end
+
+function readFreqsAndAmps(fid,freqs,amps)
+global data
+%clearing heading spaces
+tline = '';
+while 1
+    tline = fgetl(fid);
+    if(isempty(tline))
+        continue;
+    else
+        break;
+    end
+end
+
+while 1
+    if(isempty(tline) || ~ischar(tline))
+        break;
+    end
+    result = textscan(tline,'%d16 %d16');
+    freqInd = result{1};
+    ampInd = result{2};
+    data.amps = [data.amps ; amps(ampInd)];
+    data.freqs = [data.freqs ; freqs(freqInd)];
+    tline = fgetl(fid);
+end
+
+
+
+
+
+function readSinStimAmp1Params(fid)
+global data
+nextTrialNum = 2;
+while 1
+    tline = fgetl(fid);
+    if ~ischar(tline)   
+        break;   
+    end
+    [token, remain] = strtok(tline);
+    [tokenAsNum status] = str2num(token);
+    if ~status
+        continue;
+    end
+    [remainAsNum status] = str2num(remain);
+    if ~status
+        continue;
+    end
+    if  remainAsNum ~= 111  || tokenAsNum ~= 111
+        continue;
+    end
+    %we are now in the marker line for trial # trialNum
+    while 1
+        tline = fgetl(fid);
+            if ~ischar(tline)   
+                break;   
+            end
+        [freqString, ampString] = strtok(tline);
+        freq = str2double(freqString);
+        amp = str2double(ampString);
+        if(amp == (nextTrialNum*111)   && (freq == (nextTrialNum*111)) )  
+            nextTrialNum = nextTrialNum+1;
+            continue;
+        end
+        data.amps = [data.amps ; amp];
+        data.freqs = [data.freqs ; freq];
+    end
+    if ~ischar(tline)   
+        break;   
+    end
+ trialNum = trialNum +1;   
+end
+
+% stimuli intervals - an Nx4 matrix , column 1 is the beginning index of the
+% interval ,column 2 is the end index of the interval, column 3 is the amplitude,
+% column 4 is the frequency
+function stimulationIntervals = getStimulationIntervals()
+global data
+stimulationIntervals = []; 
+[numOfPoints stam] = size(data.stimuliData);
+data.stimuliAmpsAndFreqs = zeros(numOfPoints,2);
+
+lookingForStimuli = 1; % 1 - before the stimuli  , 0 during the stimuli
+i = 0;
+indexOfInterval = 1;
+while 1
+    if(numOfPoints <= i)
+        break;
+    end
+    i = i+1;
+    if(isStimuliValue(i)) % found begining of stimuli segment
+        stimBeginIndex = i;
+        stimEndIndex  = -1;
+        while 1 % looking for the end of the stimuli segment
+            i = i+1;
+            if(numOfPoints <= i)
+                break;
+            end
+            if (isIndexOfStimEnd(i)) %end of stimuli segment
+                stimEndIndex = i-1;
+                break;
+            end % end if - found end of stimuli segment
+        end % end while  - looking for the end of the stimuli segment
+        amp = data.amps(indexOfInterval);
+        freq = data.freqs(indexOfInterval);
+        indexOfInterval = indexOfInterval+1;
+        data.stimuliAmpsAndFreqs(stimBeginIndex-20:stimEndIndex+20,1) = amp;
+        data.stimuliAmpsAndFreqs(stimBeginIndex-20:stimEndIndex+20,2) = freq;        
+        stimulationIntervals = [stimulationIntervals ; stimBeginIndex  stimEndIndex amp freq];
+    end % end of if - found begining of stimuli segment 
+end
+
+function isStimEnd = isIndexOfStimEnd(index)
+global data
+maxSilentInterval = 2;
+if(  strcmp(data.stimuliFileType,'randomIso'))
+    maxSilentInterval = 12;
+end
+for i=0:maxSilentInterval
+    if(~isStimuliValue(index+i))
+       continue;
+    else
+        isStimEnd = 0;
+        return;
+    end
+end
+isStimEnd = 1;
+
+function isStim = isStimuliValue(indexInStimData)
+global data
+[numOfPoints stam] = size(data.stimuliData);
+if(indexInStimData >= numOfPoints)
+    isStim = 0;
+    return;
+end
+threshold = 0.04;
+isStim = (data.stimuliData(indexInStimData) < -threshold || data.stimuliData(indexInStimData) > threshold);
+
+
+

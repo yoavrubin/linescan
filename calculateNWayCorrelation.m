@@ -1,0 +1,126 @@
+function significantCorrelations = calculateNWayCorrelation(nWayCorrelationData, before, after, numOfSTDs, minNumOfSpikes, progressHandle, progressStartPoint, progressEndPoint)
+%   nWayCorrelationData is a list of structures, each one has the following
+%   fieds:  
+%   1) reference - the name of the reference cell. All of the other
+%       cell's spikes are relative to this cell's spikes.
+%   2) sources - a list of structures that each one of them is built in the
+%       following way:
+%       a) name: the cell's name
+%       b) offset: the relevant offset of this cell's spikes relative to
+%       the reference cell. This is a matrix with two elements in it:
+%       [offsetBegining offsetEnd] which is determined based of the base
+%       correlation and the jitter parameter
+%     this list is sorted by the offsetBeginning value of the cells
+%
+ global cells
+    significantCorrelations = [];
+    numOfCorrelations = numel(nWayCorrelationData);
+    if(numOfCorrelations == 0)
+        return;
+    end
+    allProgressInterval = progressEndPoint - progressStartPoint;
+    progressIntervalPerIteration = allProgressInterval/double(numOfCorrelations);
+    allCorrelations = [];
+   
+    for i=1:numOfCorrelations
+        correlationData = nWayCorrelationData(i);
+        numOfSources= numel(correlationData.sources);
+        referenceSpikes = cells(correlationData.reference).spikes.x;
+        if(numel(referenceSpikes) == 0)
+            continue;
+        end
+        location = 0;
+        for k=1:numOfSources
+            sourceIndex = correlationData.sources(k).name;
+            sourceSpikes = cells(sourceIndex).spikes.x;
+            referenceSpikes = filterRelativeSpikes(referenceSpikes, sourceSpikes, correlationData.sources(k).offset + location);
+             location = location + sum(correlationData.sources(k).offset)/2;
+        end
+        if(numel(referenceSpikes) == 0)
+            continue;
+        end
+        
+        progressValue = progressStartPoint + (i-1)*progressIntervalPerIteration + 0.2*progressIntervalPerIteration;
+        if(progressValue >=1)
+            progressValue = 0.99;
+        end
+        waitbar(progressValue,progressHandle);
+        possibleAdditions = getPossibleAdditions(correlationData); %possible addition
+        numOfPossibleAdditions = numel(possibleAdditions);
+        if(numOfPossibleAdditions == 0)
+            continue;
+        end
+        waitbar(progressStartPoint + (i-1)*progressIntervalPerIteration + progressIntervalPerIteration/2,progressHandle);
+        tmpCorrelations = [];
+        for j=1:numOfPossibleAdditions
+            targetName = possibleAdditions(j);
+            targetSpikes = cells(targetName).spikes.x;
+            tmpCorrelationData.correlation = calculateCrossCorrelation(referenceSpikes, targetSpikes,before-location,after+location);
+            if(isempty(tmpCorrelationData.correlation))
+                continue;
+            end
+            tmpCorrelationData.target = targetName;
+            tmpCorrelationData.source = correlationData;
+            tmpCorrelations = [tmpCorrelations; tmpCorrelationData];
+        end
+        allCorrelations = [allCorrelations ; tmpCorrelations];
+        %i
+        waitbar(progressStartPoint + (i)*progressIntervalPerIteration ,progressHandle);
+    end
+    if(numel(allCorrelations) == 0)
+        return;
+    end
+    significantCorrelations = findSignificantCorrelations(allCorrelations, minNumOfSpikes, numOfSTDs);   
+    
+function possibleAdditions =  getPossibleAdditions(correlationData)
+global crossCorrelationData
+    possibleAdditions = [];
+    numOfSources = numel(correlationData.sources);
+    lastSource = correlationData.sources(numOfSources).name;
+    pairwiseCorrelations = get(crossCorrelationData.handles.allCorrelations,'UserData');
+    sources = [pairwiseCorrelations.source];
+    relevantCorrelations = (sources == lastSource);%Sstrcmp(lastSource, {pairwiseCorrelations.source});
+    pairwiseCorrelations = pairwiseCorrelations(relevantCorrelations);
+    numOfPairwiseCorrelations = numel(pairwiseCorrelations);
+    numOfSignificantCorrelations = numel(pairwiseCorrelations);
+    for i=1:numOfSignificantCorrelations
+        %first - find a target cell to concat to the list of the source
+        %cells - need to find a pairwise correlation in which the last
+        %source cell is the source, thus making the pairwise target a
+        %target needed to be checked
+        possibleTarget = pairwiseCorrelations(i).target; % the possible target is the target of the pairwise correlation
+        if(strcmp(possibleTarget, correlationData.reference)) % not allowing cycle in which the target is the reference
+            continue;
+        end
+        isTargetOK = 1;
+        for j=1:numOfSources %not allowing cycles in which the target is already in the source cells list
+            if(possibleTarget == correlationData.sources(j).name)
+                isTargetOK = 0;
+                break;
+            end 
+        end
+        if(~isTargetOK)
+            continue;
+        end
+        %checking whether the target is also in sync with the rest of the
+        %sources and the reference,
+        %first, check if the target and the reference are synced
+        if(~crossCorrelationData.synconizationDataObject(correlationData.reference ,possibleTarget))
+            continue;
+        end
+        %iteration over all the sources, for each one of them checking if
+        %it is in sync with the possible target, if one of them is not in
+        %sync, then the target is not valid
+        for s=1:numOfSources
+            sourceName = correlationData.sources(s).name;
+            targetCorrelatedWithSource = 0;
+            if(~crossCorrelationData.synconizationDataObject(sourceName,possibleTarget))
+              isTargetOK = 0;
+              break;        
+            end
+        end 
+        if(isTargetOK)
+            possibleAdditions = [possibleAdditions ; possibleTarget];
+        end
+    end
+    
